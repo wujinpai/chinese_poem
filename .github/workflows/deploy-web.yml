@@ -33,9 +33,9 @@ jobs:
       - name: Deploy to chinese-poem-web repo
         uses: peaceiris/actions-gh-pages@v4
         with:
-          personal_token: ${{ secrets.GITHUB_TOKEN }}
+          personal_token: ${{ secrets.DEPLOY_TOKEN }}
           external_repository: wujinpai/chinese-poem-web
           publish_dir: ./build/web
           publish_branch: main
-          user_name: github-actions[bot]
-          user_email: github-actions[bot]@users.noreply.github.com
+          user_name: wujinpai
+          user_email: 888454@gmail.com
