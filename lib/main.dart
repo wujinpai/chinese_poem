@@ -48,6 +48,7 @@ class _PoemAppState extends State<PoemApp> {
       theme: ThemeData(
         colorScheme: chineseStyle15,
         useMaterial3: true,
+        fontFamily: 'NotoSansSC',
       ),
       home: Scaffold(
         body: MyHomePage(changeLocale: (locale) => _changeLocale(locale)),
