@@ -91,7 +91,7 @@ class _MyHomePageState extends State<MyHomePage> {
   List<bool> checkList = List.filled(13, false);
   bool simplifiedChinese = true;
   bool pinyinStyle1 = true;
-  bool showAbout = false;
+  
   int reading = 0;
   TtsVoice? selectedVoice;
   List<TtsVoice> availableVoices = [];
@@ -873,58 +873,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentAccountPicture: CircleAvatar(
         child: Image.asset("asset/images/poem.png"),
       ),
-      onDetailsPressed: () {
-        setState(() {
-          showAbout = !showAbout;
-        });
-      },
     );
-
-    var about = Column(children: [
-      Row(children: [
-        Expanded(
-            child: Container(
-          padding: const EdgeInsets.all(2),
-          alignment: Alignment.topCenter,
-          child: Text(PoemLocalizations.of(context).about),
-        ))
-      ]),
-      Row(children: [
-        Expanded(
-            child: Container(
-          padding: const EdgeInsets.all(2),
-          child: Text(PoemLocalizations.of(context).aboutLine1),
-        ))
-      ]),
-      Row(children: [
-        Expanded(
-            child: Container(
-          padding: const EdgeInsets.all(2),
-          child: Text(PoemLocalizations.of(context).aboutLine2),
-        ))
-      ]),
-      Row(children: [
-        Expanded(
-            child: Container(
-          padding: const EdgeInsets.all(2),
-          child: Text(PoemLocalizations.of(context).aboutLine3),
-        ))
-      ]),
-      Row(children: [
-        Expanded(
-            child: Container(
-          padding: const EdgeInsets.all(2),
-          child: Text(PoemLocalizations.of(context).aboutLine4),
-        ))
-      ]),
-      Row(children: [
-        Expanded(
-            child: Container(
-          padding: const EdgeInsets.all(2),
-          child: Text(PoemLocalizations.of(context).aboutLine5),
-        ))
-      ])
-    ]);
 
     var buttonRow1 = Row(
       children: [
@@ -1012,11 +961,7 @@ class _MyHomePageState extends State<MyHomePage> {
       );
       tileList.add(tile);
     }
-    final drawerItems = showAbout
-        ? ListView(
-            children: [drawerHeader, about],
-          )
-        : ListView(
+    final drawerItems = ListView(
             children: [
               drawerHeader,
               buttonRow1,
