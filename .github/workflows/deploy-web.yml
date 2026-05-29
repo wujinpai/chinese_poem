@@ -1,0 +1,41 @@
+name: Deploy to Web
+on:
+  push:
+    branches: [pro]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Web
+        run: flutter build web --release
+
+      - name: Optimize for WeChat (remove Service Worker)
+        run: |
+          cd build/web
+          # Remove Service Worker
+          rm -f flutter_service_worker.js
+          # Update flutter_bootstrap.js to not register Service Worker
+          sed -i '/_flutter.loader.load/{N;N;N;N;N;N;N;s/_flutter.loader.load({.*});/_flutter.loader.load({});/}' flutter_bootstrap.js
+
+      - name: Deploy to chinese-poem-web repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.GITHUB_TOKEN }}
+          external_repository: wujinpai/chinese-poem-web
+          publish_dir: ./build/web
+          publish_branch: main
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
