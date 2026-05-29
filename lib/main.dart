@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:math' hide log;
 import 'dart:ui';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:chinese_poems/draggable_floating_button.dart';
 import 'package:chinese_poems/poem_i18n.dart';
 import 'package:chinese_poems/poem_theme.dart';
@@ -10,6 +12,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+late final FlutterTts flutterTts;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,6 +91,10 @@ class _MyHomePageState extends State<MyHomePage> {
   bool simplifiedChinese = true;
   bool pinyinStyle1 = true;
   bool showAbout = false;
+  int reading = 0;
+  String voiceName = "";
+  Map<dynamic, dynamic> voice = {};
+  List<Map<dynamic, dynamic>> availableVoices = [];
   var poemJson;
 
   var choosePoem;
@@ -95,9 +103,16 @@ class _MyHomePageState extends State<MyHomePage> {
   var titleCharacters = [];
   var authorCharacters = [];
   var rowsCharacters = [];
+  var highLightCharacters = [];
   var allCharacters = [];
+  int currentSentenceIndex = 0;
+  List<String> sentences = [];
+  bool shouldContinueReading = false;
+  bool isManuallyPaused = false;
 
   final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
+
+  bool _ttsInitialized = false;
 
   OverlayEntry? _feedbackOverlay;
   Offset _feedbackPosition = Offset.zero;
@@ -223,6 +238,42 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void _initializeTTS() {
+    if (_ttsInitialized) return;
+    _ttsInitialized = true;
+
+    flutterTts = FlutterTts();
+    log("TTS initialized");
+
+    flutterTts.setStartHandler(() {
+      log("TTS Start triggered");
+      if (mounted) {
+        setState(() {
+          reading = 1;
+        });
+      }
+    });
+    flutterTts.setErrorHandler((msg) {
+      log("TTS Error: $msg");
+      shouldContinueReading = false;
+    });
+    flutterTts.setCancelHandler(() {
+      log("TTS Cancel triggered");
+      shouldContinueReading = false;
+    });
+    flutterTts.setPauseHandler(() {
+      log("TTS Pause callback triggered");
+    });
+    flutterTts.setContinueHandler(() {
+      log("TTS Continue triggered");
+      if (mounted) {
+        setState(() {
+          reading = 1;
+        });
+      }
+    });
+  }
+
   @override
   void initState() {
     log("initState begin");
@@ -235,6 +286,69 @@ class _MyHomePageState extends State<MyHomePage> {
     );
 
     super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeTTS();
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!_ttsInitialized) return;
+
+      try {
+        await flutterTts.setSpeechRate(0.5);
+        await flutterTts.setVolume(1.0);
+        await flutterTts.setPitch(1.0);
+      } catch (e) {
+        log("Error setting TTS params: $e");
+      }
+
+      try {
+        await flutterTts.awaitSpeakCompletion(true);
+      } catch (e) {
+        log("awaitSpeakCompletion not supported: $e");
+      }
+
+      try {
+        var voices = await flutterTts.getVoices;
+        if (mounted) {
+          setState(() {
+            availableVoices = voices.cast<Map<dynamic, dynamic>>();
+            availableVoices = availableVoices.where((e) {
+              if (e['features'] != null) {
+                if (e['features'].toString().contains("notInstalled")) {
+                  return false;
+                }
+              }
+              if (e['locale'] != null) {
+                if (e['locale'].toString().startsWith("zh")) {
+                  return true;
+                } else {
+                  return false;
+                }
+              } else {
+                return false;
+              }
+            }).toList();
+            if (availableVoices.isNotEmpty) {
+              try {
+                voice = availableVoices.firstWhere(
+                  (v) =>
+                      v['locale'] != null &&
+                      v['locale'].toString().startsWith("zh"),
+                  orElse: () => <dynamic, dynamic>{},
+                );
+                log("Chinese voice: $voice");
+                voiceName = voice['name']?.toString() ?? "";
+              } catch (e) {
+                log("No Chinese voice found, using default");
+              }
+            }
+          });
+        }
+      } catch (e) {
+        log("Error getting voices: $e");
+      }
+    });
 
     rootBundle.loadString('asset/datas/chinese_poems.json').then((res) => {
           poemJson = jsonDecode(res),
@@ -288,6 +402,208 @@ class _MyHomePageState extends State<MyHomePage> {
   static const _punctuationSet = {'，', '。', '？', '！', '；', "：", "、", "·"};
   bool isPunctuate(String s) {
     return _punctuationSet.contains(s);
+  }
+
+  void prepareSentences() {
+    var title = choosePoem['title_cns'];
+    var author = choosePoem['author_cns'];
+    var paragraphs = choosePoem['paragraphs_cns'];
+    sentences = [title, author, ...paragraphs];
+  }
+
+  void highlightCurrentSentence() {
+    for (Character c in titleCharacters) {
+      c.highLight = false;
+    }
+    for (Character c in authorCharacters) {
+      c.highLight = false;
+    }
+    for (var row in rowsCharacters) {
+      if (row != null) {
+        for (Character c in row) {
+          c.highLight = false;
+        }
+      }
+    }
+
+    if (currentSentenceIndex == 0) {
+      for (Character c in titleCharacters) {
+        if (!c.isPunctuate) {
+          c.highLight = true;
+        }
+      }
+    } else if (currentSentenceIndex == 1) {
+      for (Character c in authorCharacters) {
+        if (!c.isPunctuate) {
+          c.highLight = true;
+        }
+      }
+    } else {
+      int rowIndex = currentSentenceIndex - 2;
+      if (rowIndex >= 0 && rowIndex < rowsCharacters.length) {
+        var row = rowsCharacters[rowIndex];
+        if (row != null) {
+          for (Character c in row) {
+            if (!c.isPunctuate) {
+              c.highLight = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> speakCurrentSentence() async {
+    if (!mounted) {
+      log("Widget not mounted, stopping");
+      return;
+    }
+
+    log("speakCurrentSentence called: currentSentenceIndex=$currentSentenceIndex, shouldContinueReading=$shouldContinueReading, reading=$reading, sentences.length=${sentences.length}");
+
+    if (!shouldContinueReading && reading != 2) {
+      log("shouldContinueReading is false and not paused, returning");
+      return;
+    }
+
+    if (currentSentenceIndex >= sentences.length) {
+      log("All sentences read, setting shouldContinueReading to false");
+      shouldContinueReading = false;
+      if (mounted) {
+        setState(() {
+          reading = 0;
+          for (Character c in titleCharacters) {
+            c.highLight = false;
+          }
+          for (Character c in authorCharacters) {
+            c.highLight = false;
+          }
+          for (var row in rowsCharacters) {
+            if (row != null) {
+              for (Character c in row) {
+                c.highLight = false;
+              }
+            }
+          }
+        });
+      }
+      return;
+    }
+
+    var sentence = sentences[currentSentenceIndex];
+    log("Speaking sentence $currentSentenceIndex: $sentence");
+
+    setState(() {
+      highlightCurrentSentence();
+      reading = 1;
+    });
+
+    try {
+      await flutterTts.speak(sentence);
+      log("Finished speaking sentence $currentSentenceIndex");
+
+      if (mounted &&
+          shouldContinueReading &&
+          reading == 1 &&
+          !isManuallyPaused) {
+        log("Auto-reading next sentence");
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted &&
+            shouldContinueReading &&
+            reading == 1 &&
+            !isManuallyPaused) {
+          currentSentenceIndex++;
+          await speakCurrentSentence();
+        }
+      } else {
+        log("Not auto-reading next sentence: shouldContinueReading=$shouldContinueReading, reading=$reading, isManuallyPaused=$isManuallyPaused");
+      }
+    } catch (e) {
+      log("Error speaking sentence: $e");
+      shouldContinueReading = false;
+      currentSentenceIndex = 0;
+      _resetTTSCallbacks();
+      if (mounted) {
+        setState(() {
+          reading = 0;
+          for (Character c in titleCharacters) {
+            c.highLight = false;
+          }
+          for (Character c in authorCharacters) {
+            c.highLight = false;
+          }
+          for (var row in rowsCharacters) {
+            if (row != null) {
+              for (Character c in row) {
+                c.highLight = false;
+              }
+            }
+          }
+        });
+      }
+      try {
+        await flutterTts.stop();
+      } catch (e) {
+        log("Error stopping TTS: $e");
+      }
+    }
+  }
+
+  void startReading() async {
+    if (reading != 0) {
+      log("Already reading or paused, ignoring start request");
+      return;
+    }
+
+    prepareSentences();
+    currentSentenceIndex = 0;
+    shouldContinueReading = true;
+    isManuallyPaused = false;
+    await speakCurrentSentence();
+  }
+
+  void stopReading() {
+    if (!shouldContinueReading && reading == 0) {
+      log("stopReading already called, ignoring");
+      return;
+    }
+
+    log("stopReading called, current shouldContinueReading: $shouldContinueReading, reading: $reading");
+    shouldContinueReading = false;
+    currentSentenceIndex = 0;
+    if (mounted) {
+      setState(() {
+        reading = 0;
+        for (Character c in titleCharacters) {
+          c.highLight = false;
+        }
+        for (Character c in authorCharacters) {
+          c.highLight = false;
+        }
+        for (var row in rowsCharacters) {
+          if (row != null) {
+            for (Character c in row) {
+              c.highLight = false;
+            }
+          }
+        }
+      });
+    }
+    try {
+      flutterTts.stop();
+    } catch (e) {
+      log("Error stopping TTS: $e");
+    }
+  }
+
+  void _resetTTSCallbacks() {
+    flutterTts.setStartHandler(() {});
+    flutterTts.setErrorHandler((msg) {
+      log("TTS Error: $msg");
+    });
+    flutterTts.setCancelHandler(() {});
+    flutterTts.setPauseHandler(() {});
+    flutterTts.setContinueHandler(() {});
   }
 
   List<Widget> genTitleAndAuthor(context, colorScheme) {
@@ -361,7 +677,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   alignment: Alignment.center,
                   color: colorScheme.secondary,
                   child: Text(simplifiedChinese ? c.txtCns : c.txtCnt,
-                      style: TextStyle(fontSize: 25)),
+                      style: TextStyle(
+                          fontSize: 25,
+                          backgroundColor:
+                              c.highLight ? Colors.amber : null)),
                 )
               ],
             ),
@@ -393,6 +712,73 @@ class _MyHomePageState extends State<MyHomePage> {
         FittedBox(
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           Wrap(children: [
+            Showcase(
+                key: _zero,
+                description: PoemLocalizations.of(context).read,
+                descriptionTextAlign: TextAlign.center,
+                child: GestureDetector(
+                    child: IconButton(
+                  tooltip: PoemLocalizations.of(context).read,
+                  icon: () {
+                    if (reading == 1) {
+                      return Icon(Icons.pause, color: colorScheme.tertiary);
+                    } else if (reading == 2) {
+                      return Icon(Icons.play_arrow,
+                          color: colorScheme.tertiary);
+                    } else {
+                      return Icon(Icons.record_voice_over_outlined,
+                          color: colorScheme.tertiary);
+                    }
+                  }(),
+                  onPressed: () async {
+                    if (reading == 0) {
+                      try {
+                        log("Selected voice: $voice");
+                        var name = voice['name']?.toString();
+                        var locale = voice['locale']?.toString();
+                        if (name != null && locale != null) {
+                          await flutterTts
+                              .setVoice({"name": name, "locale": locale});
+                        }
+                        startReading();
+                      } catch (e) {
+                        log('Error playing audio: $e');
+                        setState(() {
+                          reading = 0;
+                        });
+                      }
+                    } else if (reading == 1) {
+                      try {
+                        shouldContinueReading = false;
+                        isManuallyPaused = true;
+                        await flutterTts.stop();
+                        log("TTS paused manually at index $currentSentenceIndex");
+                        if (mounted) {
+                          setState(() {
+                            reading = 2;
+                          });
+                        }
+                      } catch (e) {
+                        log("Error pausing TTS: $e");
+                      }
+                    } else if (reading == 2) {
+                      try {
+                        log("Resuming playback from sentence $currentSentenceIndex, sentences length: ${sentences.length}");
+                        if (sentences.isEmpty) {
+                          prepareSentences();
+                          log("Sentences prepared: ${sentences.length} sentences");
+                        }
+                        isManuallyPaused = false;
+                        shouldContinueReading = true;
+                        await speakCurrentSentence();
+                      } catch (e) {
+                        log("Error resuming TTS: $e");
+                      }
+                    } else {
+                      log("Unexpected reading state: $reading");
+                    }
+                  },
+                ))),
             Showcase(
                 key: _one,
                 description: PoemLocalizations.of(context).english,
@@ -737,6 +1123,48 @@ class _MyHomePageState extends State<MyHomePage> {
       ],
     );
 
+    var voiceDropdown = Row(children: [
+      Expanded(
+          flex: 1,
+          child: Icon(
+            Icons.record_voice_over_sharp,
+            color: colorScheme.primary,
+          )),
+      Expanded(
+        flex: 7,
+        child: DropdownButton(
+            iconEnabledColor: colorScheme.primary,
+            style: TextStyle(color: colorScheme.onSecondary, fontSize: 12),
+            isExpanded: true,
+            value: voiceName,
+            items: availableVoices.isEmpty
+                ? [
+                    DropdownMenuItem<String>(
+                        value: "", child: Text("加载中...", softWrap: true))
+                  ]
+                : availableVoices.map<DropdownMenuItem<String>>((v) {
+                    var name = v['name']?.toString() ?? '';
+                    return DropdownMenuItem<String>(
+                        value: name, child: Text(name, softWrap: true));
+                  }).toList(),
+            onChanged: (value) async {
+              if (value != null) {
+                setState(() {
+                  voiceName = value;
+                  voice = availableVoices.firstWhere(
+                    (v) => value.contains(v['name']!.toString()),
+                    orElse: () => <dynamic, dynamic>{},
+                  );
+                });
+                var name = voice['name']?.toString();
+                var locale = voice['locale']?.toString();
+                if (name != null && locale != null) {
+                  await flutterTts.setVoice({"name": name, "locale": locale});
+                }
+              }
+            }),
+      )
+    ]);
     List<Widget> tileList = [];
     for (int i = 0; i < 13; i++) {
       final tile = ListTile(
@@ -763,6 +1191,7 @@ class _MyHomePageState extends State<MyHomePage> {
               drawerHeader,
               buttonRow1,
               buttonRow2,
+              voiceDropdown,
               ...tileList,
             ],
           );
@@ -944,7 +1373,10 @@ class _MyHomePageState extends State<MyHomePage> {
                       child: Visibility(
                           visible: c.visibable,
                           child: Text(simplifiedChinese ? c.txtCns : c.txtCnt,
-                              style: TextStyle(fontSize: 25))),
+                              style: TextStyle(
+                                  fontSize: 25,
+                                  backgroundColor:
+                                      c.highLight ? Colors.amber : null))),
                     )
                   ],
                 ),
@@ -989,6 +1421,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _doChangePoem() {
     setState(() {
+      reading = 0;
+      currentSentenceIndex = 0;
       pickCharacters.clear();
       var checked = checkList.where((c) => c).toList();
       var candidates = poemJson;
@@ -1037,6 +1471,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
+    try {
+      flutterTts.stop();
+    } catch (e) {
+      log("Error stopping TTS: $e");
+    }
     _removeFeedback();
     ShowcaseView.get().unregister();
     super.dispose();
