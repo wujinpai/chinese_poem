@@ -18,6 +18,23 @@
   <title>古诗拼图</title>
   <link rel="manifest" href="manifest.json">
 
+  <script>
+    (function() {
+      var link = document.createElement('link');
+      link.rel = 'preload';
+      link.href = 'assets/fonts/NotoSansSC-Regular.ttf';
+      link.as = 'font';
+      link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+      
+      new FontFace('NotoSansSC', 'url(assets/fonts/NotoSansSC-Regular.ttf)').load().then(function(font) {
+        document.fonts.add(font);
+      }).catch(function(e) {
+        console.warn('Failed to load NotoSansSC font:', e);
+      });
+    })();
+  </script>
+
   <style>
     body {
       margin: 0;
