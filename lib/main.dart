@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:math' hide log;
 import 'dart:ui';
+import 'package:chinese_poems/poems_data.dart';
 import 'package:chinese_poems/draggable_floating_button.dart';
 import 'package:chinese_poems/poem_i18n.dart';
 import 'package:chinese_poems/poem_theme.dart';
@@ -271,36 +272,33 @@ class _MyHomePageState extends State<MyHomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeTTS();
     });
+    poemJson = poemsJson;
+    setState(() {
+      choosePoem = poemJson[Random().nextInt(poemJson.length)];
+      var paragraphsCns = choosePoem['paragraphs_cns'];
+      var paragraphsCnt = choosePoem['paragraphs_cnt'];
 
-    rootBundle.loadString('asset/datas/chinese_poems.json').then((res) => {
-          poemJson = jsonDecode(res),
+      for (int i = 0; i < paragraphsCns.length; i++) {
+        var krctCns = paragraphsCns[i].split('');
+        var krctCnt = paragraphsCnt[i].split('');
+        for (int idx = 0; idx < krctCns.length; idx++) {
+          if (!isPunctuate(krctCns[idx])) {
+            pickCharacters
+                .add(Character(krctCns[idx], krctCnt[idx], '', ''));
+          }
+        }
+      }
+      rowsCharacters = []..length = paragraphsCns.length;
+      pickCharacters.shuffle();
+
+      if (!gameMode) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           setState(() {
-            choosePoem = poemJson[Random().nextInt(poemJson.length)];
-            var paragraphsCns = choosePoem['paragraphs_cns'];
-            var paragraphsCnt = choosePoem['paragraphs_cnt'];
-
-            for (int i = 0; i < paragraphsCns.length; i++) {
-              var krctCns = paragraphsCns[i].split("");
-              var krctCnt = paragraphsCnt[i].split("");
-              for (int idx = 0; idx < krctCns.length; idx++) {
-                if (!isPunctuate(krctCns[idx])) {
-                  pickCharacters
-                      .add(Character(krctCns[idx], krctCnt[idx], '', ''));
-                }
-              }
-            }
-            rowsCharacters = []..length = paragraphsCns.length;
-            pickCharacters.shuffle();
-
-            if (!gameMode) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                setState(() {
-                  showAnswer();
-                });
-              });
-            }
-          }),
+            showAnswer();
+          });
         });
+      }
+    });
 
     _prefs.then((SharedPreferences prefs) {
       dynamic rawValue = prefs.get('showcaseview');
