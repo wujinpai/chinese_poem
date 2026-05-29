@@ -1,0 +1,59 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+/canvaskit/*.wasm
+  Content-Type: application/wasm
+  Cache-Control: public, max-age=31536000, immutable
+
+/canvaskit/*.js
+  Content-Type: application/javascript
+  Cache-Control: public, max-age=31536000, immutable
+
+/main.dart.js
+  Content-Type: application/javascript
+  Cache-Control: public, max-age=31536000, immutable
+
+/flutter.js
+  Content-Type: application/javascript
+  Cache-Control: public, max-age=31536000, immutable
+
+/flutter_bootstrap.js
+  Content-Type: application/javascript
+  Cache-Control: public, max-age=86400
+
+/flutter_service_worker.js
+  Content-Type: application/javascript
+  Cache-Control: no-cache
+
+/assets/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/asset/datas/*
+  Cache-Control: public, max-age=86400
+
+/assets/asset/images/*
+  Cache-Control: public, max-age=86400
+
+/assets/shaders/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/icons/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon.png
+  Cache-Control: public, max-age=86400
+
+/manifest.json
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=86400
+
+/version.json
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600
+
+/index.html
+  Cache-Control: no-cache

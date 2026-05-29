@@ -1,11 +1,11 @@
 {
-    "name": "chinese_poems",
-    "short_name": "chinese_poems",
+    "name": "古诗词拼图",
+    "short_name": "诗词拼图",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "chinese poems puzzle",
+    "description": "古诗词拼图 - 一款中国古诗词学习与拼图游戏应用",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
