@@ -49,7 +49,7 @@ class WebTts {
   Future<void> speak(
     String text, {
     TtsVoice? voice,
-    double rate = 0.5,
+    double rate = 0.8,
     double pitch = 1.0,
     double volume = 1.0,
   }) {
@@ -72,7 +72,7 @@ class WebTts {
         }
       }
     } else {
-      utterance.lang = 'zh-CN';
+      _setBestChineseVoice(utterance);
     }
 
     utterance.onstart = (() {
@@ -96,6 +96,40 @@ class WebTts {
     _synth.speak(utterance);
 
     return completer.future;
+  }
+
+  void _setBestChineseVoice(web.SpeechSynthesisUtterance utterance) {
+    final jsVoices = _synth.getVoices().toDart;
+    
+    List<String> preferredVoices = [
+      'Google 普通话',
+      'Google 中文',
+      'Microsoft Yaoyao - Chinese (Simplified)',
+      'Microsoft Huihui - Chinese (Simplified)',
+      'Microsoft Zira - Chinese (Simplified)',
+      '中文（普通话）',
+      '普通话',
+    ];
+
+    for (var preferredName in preferredVoices) {
+      for (var v in jsVoices) {
+        if (v.name.contains(preferredName) && v.lang.startsWith('zh')) {
+          utterance.voice = v;
+          utterance.lang = v.lang;
+          return;
+        }
+      }
+    }
+
+    for (var v in jsVoices) {
+      if (v.lang == 'zh-CN') {
+        utterance.voice = v;
+        utterance.lang = 'zh-CN';
+        return;
+      }
+    }
+
+    utterance.lang = 'zh-CN';
   }
 
   void stop() {
